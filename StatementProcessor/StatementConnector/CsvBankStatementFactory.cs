@@ -10,6 +10,7 @@ namespace StatementProcessor.StatementConnector;
 
 public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration configuration, ILogger<StatementProcessorService> logger) : IBankStatementFactory
 {
+    private static List<string> _files;
     private readonly IFileSystem _fileSystem = fileSystem;
 
     public IList<Transaction> GetTransactions(string inputFilePath)
@@ -24,7 +25,7 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
             logger.LogDebug($"Transactions for {statementFilePath}", statementFilePath);
             foreach (var transaction in transactions)
             {
-                logger.LogDebug(transaction.ToString());
+                logger.LogTrace(transaction.ToString());
             }
 
             aggregatedTransactions.AddRange(transactions);
@@ -39,6 +40,18 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         throw new NotImplementedException();
     }
 
+    public void UpdateAndArchive()
+    {
+        foreach (var file in _files)
+        {
+            _fileSystem.File.Move(
+                file,
+                _fileSystem.Path.Combine(
+                    configuration.GetValue<string>("ProcessedDirectory"),
+                    _fileSystem.Path.GetFileName(file)));
+        }
+    }
+
     private List<Transaction> GetTransactionsFromCsvFile(string statementFilePath)
     {
         logger.LogDebug("Identifying file type...");
@@ -47,7 +60,7 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         using var csv = new CsvReader(new StringReader(csvString), CultureInfo.InvariantCulture);
         csv.Read();
         csv.ReadHeader();
-        if (csv.HeaderRecord == null) throw new Exception($"No statement type found for file {statementFilePath}");
+        if (csv.HeaderRecord == null) throw new Exception($"Problem reading file: {statementFilePath}");
         var headers = csv.HeaderRecord.ToList();
 
         var statementTypes = Assembly.GetExecutingAssembly()
@@ -58,7 +71,7 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         {
             var instance = (BankStatement)Activator.CreateInstance(type);
             if (!instance.IsMatch(headers)) continue;
-            //              Logger.LogInformation($"Identified file type as {type.Name}");
+            logger.LogInformation($"Identified file type as {type.Name}");
             instance.LoadTransactions(csv.GetRecords<dynamic>());
             return instance.GetTransactions();
         }
@@ -67,16 +80,17 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
     }
 
 
-    private static List<string> GetInputFiles(string directory)
+    private List<string> GetInputFiles(string directory)
     {
         if (!Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
-        var files = new List<string>(Directory.GetFiles(directory, "*.csv"));
-        //Logger.LogInformation($"Found {files.Count} files in input folder.");
 
-        return files;
+        _files = [..Directory.GetFiles(directory, "*.csv")];
+        logger.LogInformation("Found {files} files in input folder.",_files.Count);
+
+        return _files;
     }
 
     private void MoveFileToProcessedFolder(string statementPath, string processedDirectory)

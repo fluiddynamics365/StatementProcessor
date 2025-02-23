@@ -12,9 +12,9 @@ internal class Program
 {
     public static void Main(string[] args)
     {
-        var builder = new ConfigurationBuilder();
+       // var builder = new ConfigurationBuilder();
             
-        BuildConfig(builder);
+       // BuildConfig(builder);
 
         var host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
@@ -34,7 +34,7 @@ internal class Program
     {
         builder.SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development" }.json", optional: true)
+            .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Development" }.json", optional: true)
             .AddEnvironmentVariables()
             .Build();
     }

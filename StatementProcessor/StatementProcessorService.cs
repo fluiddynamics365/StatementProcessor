@@ -15,6 +15,7 @@ public class StatementProcessorService(
 
     public void Run()
     {
+        logger.LogInformation(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
         logger.LogInformation("Statement processor service started");
         logger.LogDebug("Getting InputDirectory from configuration");
         var inputFilePath = configuration.GetValue<string>("InputDirectory");
@@ -36,5 +37,7 @@ public class StatementProcessorService(
         {
             logger.LogWarning("No transactions found");
         }
+        
+        statementFactory.UpdateAndArchive();
     }
 }
