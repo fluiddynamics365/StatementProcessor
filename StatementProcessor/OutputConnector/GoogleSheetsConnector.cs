@@ -1,16 +1,15 @@
-using System.Text;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
-using Google.Apis.Sheets.v4.Data;
-using Microsoft.Extensions.Configuration;
+using Google.Apis.Sheets.v4.Data;git 
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
 using StatementProcessor.Model;
 
 namespace StatementProcessor.OutputConnector;
 
-public class GoogleSheetsConnector(IConfiguration configuration, ILogger<StatementProcessorService> logger)
+public class GoogleSheetsConnector(IOptions<AppSettings> settings, ILogger<StatementProcessorService> logger)
     : IOutputConnector
 {
     private static readonly string[] Scopes = { SheetsService.Scope.Spreadsheets };
@@ -23,12 +22,12 @@ public class GoogleSheetsConnector(IConfiguration configuration, ILogger<Stateme
     private IList<GSheetTransaction> RetrieveTransactions()
     {
         // Get the "GoogleConnection" section as a JSON string
-        var googleConnectionSection = configuration.GetSection("GoogleSheetsConnection")
+        /*var googleConnectionSection = configuration.GetSection("GoogleSheetsConnection")
             .GetChildren()
             .AsEnumerable()
-            .ToDictionary(kv => kv.Key, kv => kv.Value);
+            .ToDictionary(kv => kv.Key, kv => kv.Value);*/
 
-        var googleCredentialsJson = JsonConvert.SerializeObject(googleConnectionSection);
+        var googleCredentialsJson = JsonSerializer.Serialize(settings.Value.GoogleSheetsConnection);// JsonConvert.SerializeObject(googleConnectionSection);
         // Load Google credentials
         var credential = GoogleCredential.FromJson(googleCredentialsJson).CreateScoped(Scopes);
 

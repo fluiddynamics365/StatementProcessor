@@ -2,16 +2,15 @@ using System.Globalization;
 using System.IO.Abstractions;
 using System.Reflection;
 using CsvHelper;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StatementProcessor.Model;
 
 namespace StatementProcessor.StatementConnector;
 
-public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration configuration, ILogger<StatementProcessorService> logger) : IBankStatementFactory
+public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSettings> settings, ILogger<StatementProcessorService> logger) : IBankStatementFactory
 {
-    private static List<string> _files;
-    private readonly IFileSystem _fileSystem = fileSystem;
+    private static List<string> _files = [];
 
     public IList<Transaction> GetTransactions(string inputFilePath)
     {
@@ -22,7 +21,7 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         {
             var transactions = GetTransactionsFromCsvFile(statementFilePath);
             
-            logger.LogDebug($"Transactions for {statementFilePath}", statementFilePath);
+            logger.LogDebug("Transactions for {statementFilePath}", statementFilePath);
             foreach (var transaction in transactions)
             {
                 logger.LogTrace(transaction.ToString());
@@ -34,28 +33,22 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         return aggregatedTransactions;
     }
     
-    
-    public void UpdateAndArchive(IList<BankStatement> bankStatements)
-    {
-        throw new NotImplementedException();
-    }
-
     public void UpdateAndArchive()
     {
         foreach (var file in _files)
         {
-            _fileSystem.File.Move(
+            fileSystem.File.Move(
                 file,
-                _fileSystem.Path.Combine(
-                    configuration.GetValue<string>("ProcessedDirectory"),
-                    _fileSystem.Path.GetFileName(file)));
+                fileSystem.Path.Combine(
+                    settings.Value.ProcessedDirectory,
+                    fileSystem.Path.GetFileName(file)));
         }
     }
 
     private List<Transaction> GetTransactionsFromCsvFile(string statementFilePath)
     {
         logger.LogDebug("Identifying file type...");
-        var csvString = _fileSystem.File.ReadAllText(statementFilePath);
+        var csvString = fileSystem.File.ReadAllText(statementFilePath);
 
         using var csv = new CsvReader(new StringReader(csvString), CultureInfo.InvariantCulture);
         csv.Read();
@@ -91,15 +84,5 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IConfiguration conf
         logger.LogInformation("Found {files} files in input folder.",_files.Count);
 
         return _files;
-    }
-
-    private void MoveFileToProcessedFolder(string statementPath, string processedDirectory)
-    {
-        if (!Directory.Exists(processedDirectory))
-        {
-            Directory.CreateDirectory(processedDirectory);
-        }
-        
-        File.Move(statementPath, Path.Combine(processedDirectory, Path.GetFileName(statementPath)));
     }
 }

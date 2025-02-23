@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using StatementProcessor.Model;
 using StatementProcessor.OutputConnector;
@@ -14,6 +14,7 @@ namespace StatementProcessor.Tests
         private Mock<IBankStatementFactory> _mockStatementFactory;
         private Mock<ILogger<StatementProcessorService>> _mockLogger;
         private StatementProcessorService _correctlyConfiguredService;
+        private IOptions<AppSettings> _settings;
 
         [SetUp]
         public void SetUp()
@@ -21,19 +22,13 @@ namespace StatementProcessor.Tests
             _mockOutputConnector = new Mock<IOutputConnector>();
             _mockStatementFactory = new Mock<IBankStatementFactory>();
             _mockLogger = new Mock<ILogger<StatementProcessorService>>();
-            
-            
-            var inMemoryConfiguration = new Dictionary<string, string?>()
+            _settings = Options.Create(new AppSettings()
             {
-                { "InputDirectory", "test-path" }
-            };
-            
-            IConfiguration configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(inMemoryConfiguration)
-                .Build();
-            
+                InputDirectory = "test-path"
+            });
+           
             _correctlyConfiguredService = new StatementProcessorService(
-                configuration,
+                _settings,
                 _mockLogger.Object,
                 _mockOutputConnector.Object,
                 _mockStatementFactory.Object
@@ -43,17 +38,10 @@ namespace StatementProcessor.Tests
         [Test]
         public void Run_ShouldThrowException_WhenInputDirectoryIsNull()
         {
-            var inMemoryConfiguration = new Dictionary<string, string?>()
-            {
-                { "InputDirectory", null }
-            };
-            
-            IConfiguration configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(inMemoryConfiguration)
-                .Build();
-            
+            var removedValueSettings = Options.Create(new AppSettings());
+
             var service = new StatementProcessorService(
-                configuration,
+                removedValueSettings,
                 _mockLogger.Object,
                 _mockOutputConnector.Object,
                 _mockStatementFactory.Object

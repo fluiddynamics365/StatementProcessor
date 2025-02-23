@@ -1,4 +1,3 @@
-using System.Globalization;
 using Newtonsoft.Json.Linq;
 
 namespace StatementProcessor.Model;
