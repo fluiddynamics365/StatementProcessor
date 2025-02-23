@@ -1,20 +1,27 @@
+using System.Linq.Expressions;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace StatementProcessor.Model;
 
-public abstract class BankStatement
+public abstract class BankStatement(ILogger<BankStatement> logger)
 {
     protected abstract string DateField { get; }
     protected abstract string DescriptionField { get; }
     protected abstract string AmountField { get; }
     protected abstract IEnumerable<string> MemoFields { get; }
-    
+
     protected abstract string? CardholderField { get; }
     protected abstract string SourceName { get; }
 
-    public List<dynamic> RawTransactions { get; set; } = [];
+    protected virtual List<Func<Transaction, bool>> Filters { get; } =
+    [
+        t => t.Amount > 0
+    ];
+
+    private List<dynamic> RawTransactions { get; set; } = [];
     public abstract bool IsMatch(List<string> headers);
-    
+
     public virtual void LoadTransactions(IEnumerable<dynamic> statementFile)
     {
         RawTransactions = statementFile.ToList();
@@ -22,7 +29,9 @@ public abstract class BankStatement
 
     public virtual List<Transaction> GetTransactions()
     {
-        List<Transaction> transactions = new List<Transaction>();
+        var transactions = new List<Transaction>();
+        logger.LogDebug("Getting transactions for {SourceName}", SourceName);
+        logger.LogDebug("{transactionCount} transactions in file", RawTransactions.Count);
         foreach (var rawTx in RawTransactions)
         {
             var txValues = rawTx as IDictionary<string, object>;
@@ -55,7 +64,16 @@ public abstract class BankStatement
                 }
             }
         }
-        return transactions;
+
+// Combine filters using LINQ's Aggregate
+        Func<Transaction, bool> combinedFilter = Filters
+            .Aggregate((current, next) => t => current(t) && next(t));
+
+        // Apply filters
+        var filteredTransactions = transactions.Where(combinedFilter).ToList();
+        logger.LogDebug("After filters, {transactionCount} transactions remaining", filteredTransactions.Count);
+
+        return filteredTransactions;
     }
 
     private string? GetCardHolder(IDictionary<string, object> txValues)
@@ -67,7 +85,7 @@ public abstract class BankStatement
     {
         if (!MemoFields.Any())
             return string.Empty;
-        
+
         JObject memo = new JObject();
         foreach (var memoField in MemoFields)
         {
@@ -79,7 +97,7 @@ public abstract class BankStatement
 
     protected virtual decimal GetAmount(IDictionary<string, object> values)
     {
-        return Convert.ToDecimal(values["Amount"].ToString());
+        return Convert.ToDecimal(values[AmountField].ToString());
     }
 
     protected virtual string GetDescription(IDictionary<string, object> values)

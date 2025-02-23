@@ -26,7 +26,7 @@ public class StatementProcessorService(
         }
         
         logger.LogCritical("Getting transactions");
-        var aggregatedTransactions = statementFactory.GetTransactions(inputDirectory);
+        var aggregatedTransactions = statementFactory.GetTransactions();
         logger.LogDebug("Total {transactionCount} transactions found", aggregatedTransactions.Count);
         if (aggregatedTransactions.Any())
         {

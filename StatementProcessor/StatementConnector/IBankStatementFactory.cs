@@ -4,6 +4,6 @@ namespace StatementProcessor.StatementConnector;
 
 public interface IBankStatementFactory
 {
-    public IList<Transaction> GetTransactions(string inputFilePath);
+    public IList<Transaction> GetTransactions();
     void UpdateAndArchive();
 }

@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging;
+
 namespace StatementProcessor.Model;
 
-public class TescoMastercard : BankStatement
+public class TescoMastercard(ILogger<TescoMastercard> logger) : BankStatement(logger)
 {
     protected override string DateField { get; } = "Transaction Date";
     protected override string DescriptionField { get; } = "Merchant";

@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging;
+
 namespace StatementProcessor.Model;
 
-public class AMEXExtStatement : BankStatement
+public class AMEXExtStatement(ILogger<AMEXExtStatement> logger) : BankStatement(logger)
 {
     protected override string DateField { get; } = "Date";
     protected override string DescriptionField => "Description";

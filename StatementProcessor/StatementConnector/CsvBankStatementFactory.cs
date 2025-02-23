@@ -2,32 +2,43 @@ using System.Globalization;
 using System.IO.Abstractions;
 using System.Reflection;
 using CsvHelper;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StatementProcessor.Model;
 
 namespace StatementProcessor.StatementConnector;
 
-public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSettings> settings, ILogger<StatementProcessorService> logger) : IBankStatementFactory
+public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSettings> settings, ILogger<StatementProcessorService> logger, IServiceProvider serviceProvider) : IBankStatementFactory
 {
-    private static List<string> _files = [];
+    private static IList<CSVFile> _files = [];
 
-    public IList<Transaction> GetTransactions(string inputFilePath)
+    public IList<Transaction> GetTransactions()
     {
-        var statementFilePaths = GetInputFiles(inputFilePath);
+        _files = GetInputFiles(settings.Value.InputDirectory);
+        logger.LogDebug("Found {fileCount} files to process", _files.Count);
         var aggregatedTransactions = new List<Transaction>();
         
-        foreach (var statementFilePath in statementFilePaths)
+        foreach (var statementFilePath in _files)
         {
-            var transactions = GetTransactionsFromCsvFile(statementFilePath);
-            
-            logger.LogDebug("Transactions for {statementFilePath}", statementFilePath);
-            foreach (var transaction in transactions)
+            try
             {
-                logger.LogTrace(transaction.ToString());
-            }
+                var transactions = GetTransactionsFromCsvFile(statementFilePath.FilePath);
+            
+                logger.LogTrace("Transactions for {statementFilePath}", statementFilePath);
+                foreach (var transaction in transactions)
+                {
+                    logger.LogTrace(transaction.ToString());
+                }
 
-            aggregatedTransactions.AddRange(transactions);
+                aggregatedTransactions.AddRange(transactions);
+                
+                statementFilePath.ProcessedSuccessfully = true;
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Unable to read file {filePath}", statementFilePath);
+            }
         }
         
         return aggregatedTransactions;
@@ -35,13 +46,13 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSetting
     
     public void UpdateAndArchive()
     {
-        foreach (var file in _files)
+        foreach (var file in _files.Where(f => f.ProcessedSuccessfully))
         {
             fileSystem.File.Move(
-                file,
+                file.FilePath,
                 fileSystem.Path.Combine(
                     settings.Value.ProcessedDirectory,
-                    fileSystem.Path.GetFileName(file)));
+                    fileSystem.Path.GetFileName(file.FilePath)));
         }
     }
 
@@ -62,9 +73,9 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSetting
 
         foreach (var type in statementTypes)
         {
-            var instance = (BankStatement)Activator.CreateInstance(type);
+            var instance = (BankStatement)ActivatorUtilities.CreateInstance(serviceProvider, type);
             if (!instance.IsMatch(headers)) continue;
-            logger.LogInformation($"Identified file type as {type.Name}");
+            logger.LogInformation("Identified file type as {typeName}", type.Name);
             instance.LoadTransactions(csv.GetRecords<dynamic>());
             return instance.GetTransactions();
         }
@@ -72,17 +83,16 @@ public class CSVBankStatementFactory(IFileSystem fileSystem, IOptions<AppSetting
         throw new Exception($"No statement type found for file {statementFilePath}");
     }
 
-
-    private List<string> GetInputFiles(string directory)
+    private List<CSVFile> GetInputFiles(string directory)
     {
         if (!Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        _files = [..Directory.GetFiles(directory, "*.csv")];
-        logger.LogInformation("Found {files} files in input folder.",_files.Count);
+        var files = Directory.GetFiles(directory, "*.csv").Select(f => new CSVFile() { FilePath = f }).ToList();
+        logger.LogInformation("Found {files} files in input folder.", files.Count);
 
-        return _files;
+        return files;
     }
 }

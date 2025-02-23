@@ -49,7 +49,7 @@ namespace StatementProcessor.Tests
 
             Assert.Throws<ArgumentNullException>(() => service.Run());
 
-            _mockStatementFactory.Verify(sf => sf.GetTransactions(It.IsAny<string>()), Times.Never);
+            _mockStatementFactory.Verify(sf => sf.GetTransactions(), Times.Never);
             _mockOutputConnector.Verify(oc => oc.AddTransactions(It.IsAny<IEnumerable<Transaction>>()), Times.Never);
         }
 
@@ -75,22 +75,22 @@ namespace StatementProcessor.Tests
             };
             
             
-            _mockStatementFactory.Setup(sf => sf.GetTransactions("test-path")).Returns(transactions);
+            _mockStatementFactory.Setup(sf => sf.GetTransactions()).Returns(transactions);
                 
             _correctlyConfiguredService.Run();
 
-            _mockStatementFactory.Verify(sf => sf.GetTransactions("test-path"), Times.Once);
+            _mockStatementFactory.Verify(sf => sf.GetTransactions(), Times.Once);
             _mockOutputConnector.Verify(oc => oc.AddTransactions(It.Is<IEnumerable<Transaction>>(t => t.First().TxDate == DateTime.Parse("2024-01-01"))), Times.Once);
         }
 
         [Test]
         public void Run_ShouldNotSendToOutputConnector_WhenZeroRecordsReturned()
         {
-            _mockStatementFactory.Setup(sf => sf.GetTransactions("test-path")).Returns(new List<Transaction>());
+            _mockStatementFactory.Setup(sf => sf.GetTransactions()).Returns(new List<Transaction>());
                 
             _correctlyConfiguredService.Run();
 
-            _mockStatementFactory.Verify(sf => sf.GetTransactions("test-path"), Times.Once);
+            _mockStatementFactory.Verify(sf => sf.GetTransactions(), Times.Once);
             _mockOutputConnector.Verify(oc => oc.AddTransactions(It.IsAny<IEnumerable<Transaction>>()), Times.Never);
         }
     }
